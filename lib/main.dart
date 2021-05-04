@@ -1,113 +1,210 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-void main() {
-  runApp(MyApp());
-}
+import  'package:provider/provider.dart';
+
+void main() => runApp(MyApp());
 
 class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'LAB11',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
         primarySwatch: Colors.blue,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: MultiProvider(
+        providers: [
+          ChangeNotifierProvider<CountProvider>.value(value: CountProvider()),
+          FutureProvider(create: (_) async => UserProvider().loadUserData()),
+          StreamProvider(create: (_) => EventProvider().intStream(), initialData: 0),
+        ],
+        child: DefaultTabController(
+          length: 3,
+          child: DefaultTabController(
+            length: 3,
+            child: Scaffold(
+              appBar: AppBar(
+                title: Text("Provider"),
+                centerTitle: true,
+                bottom: TabBar(
+                  tabs: <Widget>[
+                    Tab(icon: Icon(Icons.add)),
+                    Tab(icon: Icon(Icons.person)),
+                    Tab(icon: Icon(Icons.message)),
+                  ],
+                ),
+              ),
+              body: TabBarView(
+                children: <Widget>[
+                  MyCountPage(),
+                  MyUserPage(),
+                  MyEventPage(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  _MyHomePageState createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
+class MyCountPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    CountProvider _state = Provider.of<CountProvider>(context);
     return Scaffold(
-      appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
+            Text('ChangeNotifierProvider Example',
+                style: TextStyle(fontSize: 20)),
+            SizedBox(height: 50),
+            Text('${_state.counterValue}',
+                style: Theme.of(context).textTheme.headline4),
+            ButtonBar(
+              alignment: MainAxisAlignment.center,
+              children: <Widget>[
+                IconButton(
+                  icon: Icon(Icons.remove),
+                  color: Colors.yellow,
+                  onPressed: () => _state._decrementCount(),
+                ),
+                Consumer<CountProvider>(
+                  builder: (context, value, child) {
+                    return IconButton(
+                      icon: Icon(Icons.add),
+                      color: Colors.green,
+                      onPressed: () => value._incrementCount(),
+                    );
+                  },
+                ),
+              ],
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
+}
+
+class MyUserPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        Padding(
+          padding: EdgeInsets.all(10.0),
+          child: Text('FutureProvider Example, users loaded from a File',
+              style: TextStyle(fontSize: 17)),
+        ),
+        Consumer<List<User>>(
+          builder: (context, List<User> users, _) {
+            return Expanded(
+              child: users == null
+                  ? Container(child: Center(child: CircularProgressIndicator()))
+                  : ListView.builder(
+                itemCount: users.length,
+                itemBuilder: (context, index) {
+                  return Container(
+                      height: 50,
+                      color: Colors.grey[(index * 200) % 400],
+                      child: Center(
+                          child: Text(
+                              '${users[index].firstName} ${users[index].lastName} | ${users[index].website}')));
+                },
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// Event page (counting)
+class MyEventPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    var _value = Provider.of<int>(context);
+     return Container(
+        child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('StreamProvider Example', style: TextStyle(fontSize: 20)),
+                SizedBox(height: 50),
+                Text('${_value.toString()}', style: Theme.of(context).textTheme.headline4)
+              ],
+            )));
+  }
+}
+
+// CountProvider (ChangeNotifier)
+class CountProvider extends ChangeNotifier {
+  int _count = 0;
+  int get counterValue => _count;
+
+  void _incrementCount() {
+    _count++;
+    notifyListeners();
+  }
+
+  void _decrementCount() {
+    _count--;
+    notifyListeners();
+  }
+}
+
+// UserProvider (Future)
+class UserProvider {
+  final String _dataPath = "assets/users.json";
+  List<User> users;
+
+  Future<String> loadAsset() async {
+    return await Future.delayed(Duration(seconds: 2), () async {
+      return await rootBundle.loadString(_dataPath);
+    });
+  }
+
+   Future<List<User>> loadUserData() async {
+    var dataString = await loadAsset();
+    Map<String, dynamic> jsonUserData = jsonDecode(dataString);
+    users = UserList.fromJson(jsonUserData['users']).users;
+    return users;
+   }
+}
+
+// EventProvider (Stream)
+class EventProvider {
+  Stream<int> intStream() {
+    Duration interval = Duration(seconds: 2);
+    return Stream<int>.periodic(interval, (int _count) => _count++);
+  }
+}
+
+// User Model
+class User {
+  final String firstName, lastName, website;
+  const User(this.firstName, this.lastName, this.website);
+
+  User.fromJson(Map<String, dynamic> json)
+      : this.firstName = json['first_name'],
+        this.lastName = json['last_name'],
+        this.website = json['website'];
+
+}
+
+// User List Model
+class UserList {
+  final List<User> users;
+  UserList(this.users);
+
+  UserList.fromJson(List<dynamic> usersJson)
+      : users = usersJson.map((user) => User.fromJson(user)).toList();
 }
